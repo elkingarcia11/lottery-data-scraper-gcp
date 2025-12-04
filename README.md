@@ -1,4 +1,4 @@
-# Jackpot IQ Updater
+# Lottery Data Scraper with Google Cloud Integration
 
 A Python application that scrapes lottery data (Powerball and Mega Millions), calculates statistical significance, and stores the results locally and optionally in Google Cloud Storage.
 
