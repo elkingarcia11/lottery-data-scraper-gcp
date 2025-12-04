@@ -19,12 +19,25 @@ def verify_frequency_stats(stats):
     Returns:
         bool: True if verification passes
     """
+    # Handle case where there are no draws
+    if stats.get('totalDraws', 0) == 0:
+        print("  No draws to verify (totalDraws = 0)")
+        return True
+    
     # Get the residuals for regular numbers by position
     position_residuals = stats['byPosition']
+    
+    if not position_residuals:
+        print("  No position data to verify")
+        return True
     
     # Calculate total draws from the first position's frequency
     first_position = list(position_residuals.keys())[0]  # Get first position key
     total_draws = sum(res['observed'] for res in position_residuals[first_position].values())
+    
+    if total_draws == 0:
+        print("  No draws found in position data")
+        return True
     
     # Verify each position has the correct number of draws
     for pos_key in position_residuals.keys():
@@ -81,15 +94,18 @@ def calculate_lottery_stats(mm_input="data/mm.json",
         pb_stats = calculate_stats_for_type(pb_draws, "powerball", 
                                            max_regular=69, max_special=26)
         
-        # Verify all frequency statistics
-        print("\nVerifying all frequency statistics...")
-        mm_verified = verify_frequency_stats(mm_stats)
-        pb_verified = verify_frequency_stats(pb_stats)
-        
-        if mm_verified and pb_verified:
-            print("\nAll frequency statistics verified successfully!")
+        # Verify all frequency statistics (only if there are draws)
+        if mm_stats['totalDraws'] > 0 or pb_stats['totalDraws'] > 0:
+            print("\nVerifying all frequency statistics...")
+            mm_verified = verify_frequency_stats(mm_stats) if mm_stats['totalDraws'] > 0 else True
+            pb_verified = verify_frequency_stats(pb_stats) if pb_stats['totalDraws'] > 0 else True
+            
+            if mm_verified and pb_verified:
+                print("\nAll frequency statistics verified successfully!")
+            else:
+                print("\nWARNING: Some frequency statistics verification failed. Check the logs above.")
         else:
-            print("\nWARNING: Some frequency statistics verification failed. Check the logs above.")
+            print("\nNo draws found. Statistics initialized with default values.")
         
         # Save the statistics to separate files
         with open(mm_output, 'w') as f:
@@ -269,7 +285,31 @@ def calculate_standardized_residuals(frequency_dict, total_draws, max_number):
         dict: Dictionary of standardized residuals
     """
     residuals = {}
+    
+    # Handle case where there are no draws
+    if total_draws == 0:
+        expected = 0.0
+        for number, observed in frequency_dict.items():
+            residuals[number] = {
+                "observed": observed,
+                "expected": expected,
+                "residual": 0.0,
+                "significant": False
+            }
+        return residuals
+    
     expected = total_draws / max_number
+    
+    # Avoid division by zero if expected is 0
+    if expected == 0:
+        for number, observed in frequency_dict.items():
+            residuals[number] = {
+                "observed": observed,
+                "expected": expected,
+                "residual": 0.0,
+                "significant": False
+            }
+        return residuals
     
     for number, observed in frequency_dict.items():
         residual = (observed - expected) / (expected ** 0.5)
@@ -296,9 +336,26 @@ def calculate_position_specific_residuals(frequency_at_position, total_draws, k)
     """
     # Each position has k-4 possible numbers
     possible_numbers_per_position = k - 4
-    expected_frequency = total_draws / possible_numbers_per_position
+    expected_frequency = total_draws / possible_numbers_per_position if total_draws > 0 else 0.0
     
     position_residuals = {}
+    
+    # Handle case where there are no draws
+    if total_draws == 0 or expected_frequency == 0:
+        for pos in range(5):
+            pos_str = str(pos)
+            pos_freq = frequency_at_position[pos_str]
+            residuals = {}
+            for num, observed in pos_freq.items():
+                residuals[num] = {
+                    "frequency": observed,
+                    "expected": expected_frequency,
+                    "standardized_residual": 0.0,
+                    "significant": False,
+                    "verySignificant": False
+                }
+            position_residuals[pos_str] = residuals
+        return position_residuals
     
     # Calculate residuals for each position (0-4 for regular numbers)
     for pos in range(5):
@@ -386,15 +443,21 @@ def calculate_stats_for_type(draws, lottery_type, max_regular, max_special):
     total_regular = sum(frequency.values())
     total_special = sum(special_frequency.values())
     
-    if total_regular != valid_draws * 5:
-        print(f"Warning: Total regular number frequency ({total_regular}) does not match expected ({valid_draws * 5})")
+    if valid_draws > 0:
+        if total_regular != valid_draws * 5:
+            print(f"Warning: Total regular number frequency ({total_regular}) does not match expected ({valid_draws * 5})")
+        
+        if total_special != valid_draws:
+            print(f"Warning: Total special ball frequency ({total_special}) does not match expected ({valid_draws})")
     
-    if total_special != valid_draws:
-        print(f"Warning: Total special ball frequency ({total_special}) does not match expected ({valid_draws})")
-    
-    # Calculate optimized numbers
-    optimized_by_position = find_optimized_numbers(frequency, special_frequency)
-    optimized_by_general_frequency = find_optimized_numbers(frequency, special_frequency)
+    # Calculate optimized numbers (handle empty case)
+    if valid_draws == 0:
+        # Return default values when there are no draws
+        optimized_by_position = [1, 2, 3, 4, 5, 1]
+        optimized_by_general_frequency = [1, 2, 3, 4, 5, 1]
+    else:
+        optimized_by_position = find_optimized_numbers(frequency, special_frequency)
+        optimized_by_general_frequency = find_optimized_numbers(frequency, special_frequency)
     
     # Calculate standardized residuals
     regular_residuals = calculate_standardized_residuals(frequency, valid_draws * 5, max_regular)

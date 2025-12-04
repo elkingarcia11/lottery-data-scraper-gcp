@@ -18,10 +18,11 @@ GCS_BUCKET = os.getenv('GCS_BUCKET', 'jackpot-iq')
 
 def download_from_gcs():
     """
-    Download JSON files from Google Cloud Storage using application default credentials
+    Download JSON files from Google Cloud Storage using application default credentials.
+    If GCS is unavailable, falls back to local files.
     """
     try:
-        print(f"Downloading files from GCS bucket: {GCS_BUCKET}")
+        print(f"Attempting to download files from GCS bucket: {GCS_BUCKET}")
         
         # Initialize storage client with default credentials
         storage_client = storage.Client()
@@ -40,7 +41,7 @@ def download_from_gcs():
                 blob.download_to_filename(local_path)
                 print(f"Downloaded {filename} to {local_path}")
             else:
-                print(f"File {filename} not found in GCS bucket. Will create it if needed.")
+                print(f"File {filename} not found in GCS bucket. Using local file if it exists.")
                 # Create empty file if it doesn't exist locally
                 if not os.path.exists(local_path):
                     with open(local_path, 'w') as f:
@@ -50,22 +51,23 @@ def download_from_gcs():
         return True
         
     except Exception as e:
-        print(f"Error downloading files from GCS: {e}")
-        # Create empty files if download fails
+        print(f"Warning: Could not download from GCS ({e}). Continuing with local files.")
+        # Ensure local files exist if download fails
         for filename in ['mm.json', 'pb.json']:
             local_path = os.path.join(DATA_DIR, filename)
             if not os.path.exists(local_path):
                 with open(local_path, 'w') as f:
                     json.dump([], f)
-                print(f"Created empty {local_path} after GCS error")
+                print(f"Created empty {local_path} (GCS unavailable)")
         return False
 
 def upload_to_gcs():
     """
-    Upload JSON files to Google Cloud Storage using application default credentials
+    Upload JSON files to Google Cloud Storage using application default credentials.
+    If GCS is unavailable, files remain saved locally.
     """
     try:
-        print(f"Uploading files to GCS bucket: {GCS_BUCKET}")
+        print(f"Attempting to upload files to GCS bucket: {GCS_BUCKET}")
         
         # Initialize storage client with default credentials
         storage_client = storage.Client()
@@ -86,10 +88,11 @@ def upload_to_gcs():
             blob.upload_from_filename(local_path)
             print(f"Uploaded {local_path} to GCS as data/{filename}")
         
+        print("Successfully uploaded all files to GCS")
         return True
         
     except Exception as e:
-        print(f"Error uploading files to GCS: {e}")
+        print(f"Warning: Could not upload to GCS ({e}). Files saved locally in {DATA_DIR}/")
         return False
 
 def get_latest_draws():
@@ -297,15 +300,19 @@ def scrape_lottery_data():
     """
     Scrape lottery data using the latest draw dates from local JSON files.
     Automatically updates statistics if new draws are added.
+    Always saves to local files, regardless of GCS availability.
     
     Returns:
         dict: Results with new draws
     """
     try:
-        # First, download files from GCS
-        download_from_gcs()
+        # Try to download files from GCS (non-blocking - continues if it fails)
+        try:
+            download_from_gcs()
+        except Exception as e:
+            print(f"Note: GCS download failed ({e}). Using local files only.")
         
-        # Get latest draw dates from JSON files
+        # Get latest draw dates from JSON files (always works with local files)
         latest_draws = get_latest_draws()
         
         # If no draws found, set default dates to start from
@@ -372,9 +379,13 @@ def scrape_lottery_data():
         if any_new_draws:
             update_statistics()
         
-        # Upload updated files to GCS
-        upload_to_gcs()
+        # Try to upload updated files to GCS (non-blocking - files already saved locally)
+        try:
+            upload_to_gcs()
+        except Exception as e:
+            print(f"Note: GCS upload failed ({e}). Files remain saved locally.")
         
+        print(f"\nAll data saved locally to {DATA_DIR}/ directory")
         return {
             'powerball': filtered_powerball,
             'megamillions': filtered_megamillions
@@ -382,6 +393,7 @@ def scrape_lottery_data():
         
     except Exception as e:
         print(f"Error in scrape_lottery_data: {e}")
+        print(f"Note: Local files may still have been updated. Check {DATA_DIR}/ directory.")
         return None
 
 if __name__ == "__main__":
