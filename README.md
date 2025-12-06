@@ -139,7 +139,7 @@ pip install -r requirements.txt
    - Create a `.env` file with your GCS bucket name:
 
      ```
-     GCS_BUCKET=your-bucket-name
+     LOTTERY_DATA_SCRAPER_BUCKET=your-bucket-name
      ```
 
    - Place GCS credentials in `gcs_credentials.json` at the root of the project
@@ -153,12 +153,43 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Local Execution
+
 Run the main script:
 
 ```bash
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 python main.py
 ```
+
+### Docker Execution (One-Time Run)
+
+Build and run the application in a Docker container:
+
+```bash
+# Build the image
+docker build -t lottery-scraper .
+
+# Run once (with data persistence)
+docker run --rm \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/gcs_credentials.json:/app/gcs_credentials.json:ro \
+  -e LOTTERY_DATA_SCRAPER_BUCKET=your-bucket-name \
+  lottery-scraper
+```
+
+**Simplified run (without GCS):**
+
+```bash
+docker run --rm -v $(pwd)/data:/app/data lottery-scraper
+```
+
+**Notes**:
+
+- The `data/` directory is mounted as a volume to persist results locally
+- GCS credentials are optional - mount them only if you want to sync with GCS
+- The container runs once and exits automatically
+- To run again, simply execute the `docker run` command again
 
 If you have GCS credentials set up, the script will:
 

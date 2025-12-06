@@ -14,7 +14,7 @@ DATA_DIR = 'data'
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # GCS bucket name from environment variable or use default
-GCS_BUCKET = os.getenv('GCS_BUCKET', 'jackpot-iq')
+LOTTERY_DATA_SCRAPER_BUCKET = os.getenv('LOTTERY_DATA_SCRAPER_BUCKET', 'jackpot-iq')
 
 def download_from_gcs():
     """
@@ -22,11 +22,11 @@ def download_from_gcs():
     If GCS is unavailable, falls back to local files.
     """
     try:
-        print(f"Attempting to download files from GCS bucket: {GCS_BUCKET}")
+        print(f"Attempting to download files from GCS bucket: {LOTTERY_DATA_SCRAPER_BUCKET}")
         
         # Initialize storage client with default credentials
         storage_client = storage.Client()
-        bucket = storage_client.bucket(GCS_BUCKET)
+        bucket = storage_client.bucket(LOTTERY_DATA_SCRAPER_BUCKET)
         
         # Files to download
         files = ['mm.json', 'pb.json']
@@ -67,11 +67,11 @@ def upload_to_gcs():
     If GCS is unavailable, files remain saved locally.
     """
     try:
-        print(f"Attempting to upload files to GCS bucket: {GCS_BUCKET}")
+        print(f"Attempting to upload files to GCS bucket: {LOTTERY_DATA_SCRAPER_BUCKET}")
         
         # Initialize storage client with default credentials
         storage_client = storage.Client()
-        bucket = storage_client.bucket(GCS_BUCKET)
+        bucket = storage_client.bucket(LOTTERY_DATA_SCRAPER_BUCKET)
         
         # Files to upload
         files = ['mm.json', 'pb.json', 'mm-stats.json', 'pb-stats.json']

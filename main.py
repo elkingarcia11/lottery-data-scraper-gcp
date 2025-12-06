@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get bucket name from environment variable or use default
-BUCKET_NAME = os.getenv('GCS_BUCKET', 'jackpot-iq')
+BUCKET_NAME = os.getenv('LOTTERY_DATA_SCRAPER_BUCKET', 'jackpot-iq')
 
 def main():
     """

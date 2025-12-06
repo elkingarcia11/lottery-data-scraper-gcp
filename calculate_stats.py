@@ -3,7 +3,6 @@
 import json
 import argparse
 import os
-from collections import defaultdict
 
 # Ensure data directory exists
 DATA_DIR = 'data'
