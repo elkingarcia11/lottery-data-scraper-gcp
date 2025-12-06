@@ -209,6 +209,8 @@ gcloud run deploy lottery-scraper \
 
 **Trigger the scraper:**
 
+**Method 1: Manual HTTP Request**
+
 ```bash
 # Get the service URL
 SERVICE_URL=$(gcloud run services describe lottery-scraper --region us-central1 --format 'value(status.url)')
@@ -216,6 +218,36 @@ SERVICE_URL=$(gcloud run services describe lottery-scraper --region us-central1 
 # Trigger the scraper via HTTP
 curl -X POST $SERVICE_URL
 ```
+
+**Method 2: Cloud Scheduler (Automated Daily at 11:59 PM)**
+
+```bash
+# Get your service URL
+SERVICE_URL=$(gcloud run services describe lottery-scraper --region us-central1 --format 'value(status.url)')
+
+# Create a scheduled job to run daily at 11:59 PM UTC
+gcloud scheduler jobs create http lottery-scraper-daily \
+  --location=us-central1 \
+  --schedule="59 23 * * *" \
+  --uri="$SERVICE_URL" \
+  --http-method=POST \
+  --time-zone="UTC"
+
+# To use a different timezone (e.g., US Eastern Time)
+gcloud scheduler jobs create http lottery-scraper-daily \
+  --location=us-central1 \
+  --schedule="59 23 * * *" \
+  --uri="$SERVICE_URL" \
+  --http-method=POST \
+  --time-zone="America/New_York"
+```
+
+**Method 3: From Cloud Console**
+
+1. Go to Cloud Run in Google Cloud Console
+2. Click on your `lottery-scraper` service
+3. Click "TESTING" tab
+4. Click "TRIGGER" button to send a test request
 
 **Health check:**
 
@@ -228,7 +260,8 @@ curl $SERVICE_URL/health
 - The service listens on the `PORT` environment variable (default 8080, Cloud Run provides this)
 - Data is saved to GCS (configured via `LOTTERY_DATA_SCRAPER_BUCKET`)
 - The service responds to HTTP requests and runs the scraper on each POST/GET to `/`
-- Use Cloud Scheduler to trigger it periodically if needed
+- **Recommended**: Use Cloud Scheduler (Method 2 above) to automatically run daily at 11:59 PM
+- Each trigger runs the scraper once and returns a JSON response
 
 If you have GCS credentials set up, the script will:
 
