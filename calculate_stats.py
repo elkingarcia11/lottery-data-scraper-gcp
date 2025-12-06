@@ -140,137 +140,193 @@ def sort_frequency_dict(freq_dict):
     # Convert back to dictionary (maintaining order in Python 3.7+)
     return {k: v for k, v in sorted_items}
 
-def find_optimized_numbers(frequency_dict, special_frequency):
+def get_existing_combinations(draws):
     """
-    Find optimized winning numbers based on frequency data
+    Extract all existing number combinations from draws
     
     Args:
-        frequency_dict (dict): Dictionary of number frequencies
-        special_frequency (dict): Dictionary of special ball frequencies
+        draws (list): List of draw dictionaries
     
     Returns:
-        list: List of optimized numbers [5 regular numbers + 1 special ball]
+        set: Set of tuples representing existing combinations (numbers + specialBall)
     """
-    # Sort regular numbers by frequency
-    sorted_regular = sorted(frequency_dict.items(), 
-                          key=lambda x: x[1], 
-                          reverse=True)
-    
-    # Get top 5 regular numbers
-    optimized_regular = [int(num) for num, _ in sorted_regular[:5]]
-    optimized_regular.sort()  # Sort in ascending order
-    
-    # Get most frequent special ball
-    sorted_special = sorted(special_frequency.items(), 
-                          key=lambda x: x[1], 
-                          reverse=True)
-    best_special_ball = int(sorted_special[0][0])
-    
-    return optimized_regular + [best_special_ball]
+    existing = set()
+    for draw in draws:
+        if isinstance(draw, dict):
+            numbers = draw.get('numbers', [])
+            special_ball = draw.get('specialBall')
+            if isinstance(numbers, list) and len(numbers) == 5 and isinstance(special_ball, int):
+                # Store as tuple: (num1, num2, num3, num4, num5, specialBall)
+                combo = tuple(sorted(numbers)) + (special_ball,)
+                existing.add(combo)
+    return existing
 
-def find_optimized_numbers_by_general_frequency(frequency, special_ball_frequency, existing_combinations, max_regular):
+def optimized_by_general_frequency_repeat(frequency, special_frequency):
     """
-    Find optimized numbers based on general frequency (not position-specific)
+    Find top 5 numbers and 1 special ball with highest general frequency (can repeat)
     
     Args:
         frequency (dict): Dictionary of number frequencies across all positions
-        special_ball_frequency (dict): Dictionary of special ball frequencies
-        existing_combinations (set): Set of existing combinations
-        max_regular (int): Maximum regular number value
-        
+        special_frequency (dict): Dictionary of special ball frequencies
+    
     Returns:
-        list: Optimized winning numbers [regular1, regular2, regular3, regular4, regular5, special]
+        list: [5 regular numbers + 1 special ball] sorted
     """
-    # Convert frequency dict to list of tuples and sort by frequency (descending)
-    freq_list = [(int(num), int(freq)) for num, freq in frequency.items()]
-    freq_list.sort(key=lambda x: x[1], reverse=True)
+    # Sort by frequency (descending)
+    sorted_regular = sorted(frequency.items(), key=lambda x: int(x[1]), reverse=True)
+    sorted_special = sorted(special_frequency.items(), key=lambda x: int(x[1]), reverse=True)
     
-    # Convert special ball frequency dict to list and sort
-    special_freq_list = [(int(num), int(freq)) for num, freq in special_ball_frequency.items()]
-    special_freq_list.sort(key=lambda x: x[1], reverse=True)
-    
-    # Take the top 5 most frequent regular numbers
-    optimized_regular = [freq_list[i][0] for i in range(min(5, len(freq_list)))]
-    
-    # Always take the most frequent special ball
-    best_special_ball = special_freq_list[0][0] if special_freq_list else 1
-    
-    # Sort the regular numbers
+    # Get top 5 regular numbers
+    optimized_regular = [int(num) for num, _ in sorted_regular[:5]]
     optimized_regular.sort()
     
-    # Create a set of just the regular number combinations (without special ball)
-    # to check if this exact set of 5 regular numbers has appeared before
-    existing_regular_sets = set()
-    for combo in existing_combinations:
-        existing_regular_sets.add(tuple(sorted(combo[:5])))
+    # Get most frequent special ball
+    best_special = int(sorted_special[0][0]) if sorted_special else 1
     
-    # Check if this set of regular numbers already exists
-    regular_set = tuple(optimized_regular)
+    return optimized_regular + [best_special]
+
+def optimized_by_general_frequency_no_repeat(frequency, special_frequency, existing_combinations, max_regular, max_special):
+    """
+    Find top 5 numbers and 1 special ball with highest general frequency that hasn't been drawn yet
     
+    Args:
+        frequency (dict): Dictionary of number frequencies across all positions
+        special_frequency (dict): Dictionary of special ball frequencies
+        existing_combinations (set): Set of existing combinations
+        max_regular (int): Maximum regular number
+        max_special (int): Maximum special ball number
+    
+    Returns:
+        list: [5 regular numbers + 1 special ball] that hasn't been drawn
+    """
+    # Sort by frequency (descending)
+    sorted_regular = sorted(frequency.items(), key=lambda x: int(x[1]), reverse=True)
+    sorted_special = sorted(special_frequency.items(), key=lambda x: int(x[1]), reverse=True)
+    
+    # Try combinations until we find one that hasn't been drawn
+    max_attempts = 1000
     attempts = 0
-    max_attempts = 100  # Limit to prevent infinite loops
     
-    while regular_set in existing_regular_sets and attempts < max_attempts:
-        # Try replacing one of the regular numbers with the next most frequent
-        if attempts < len(freq_list) - 5:
-            # Replace the least frequent number in our current set with the next most frequent
-            # from our overall frequency list that we haven't used yet
-            next_best_index = 5 + attempts
-            if next_best_index < len(freq_list):
-                next_best_number = freq_list[next_best_index][0]
-                
-                # Find the least frequent number in our current selection
-                least_frequent_idx = 0
-                least_frequent_val = float('inf')
-                
-                for i, num in enumerate(optimized_regular):
-                    # Find this number's frequency
-                    num_freq = next((f for n, f in freq_list if n == num), 0)
-                    if num_freq < least_frequent_val:
-                        least_frequent_val = num_freq
-                        least_frequent_idx = i
-                
-                # Replace it with our next best number
-                optimized_regular[least_frequent_idx] = next_best_number
+    for i in range(min(20, len(sorted_regular))):  # Try top 20 regular numbers
+        for j in range(min(10, len(sorted_regular))):
+            for k in range(min(10, len(sorted_regular))):
+                for l in range(min(10, len(sorted_regular))):
+                    for m in range(min(10, len(sorted_regular))):
+                        if attempts >= max_attempts:
+                            break
+                        attempts += 1
+                        
+                        # Get 5 different numbers from top frequent ones
+                        candidates = [sorted_regular[i][0], sorted_regular[j][0], 
+                                     sorted_regular[k][0], sorted_regular[l][0], sorted_regular[m][0]]
+                        candidates = [int(c) for c in candidates]
+                        
+                        # Check if all numbers are unique
+                        if len(set(candidates)) != 5:
+                            continue
+                        
+                        # Try each special ball
+                        for special_item in sorted_special[:10]:
+                            special_ball = int(special_item[0])
+                            candidates_sorted = sorted(candidates)
+                            combo = tuple(candidates_sorted) + (special_ball,)
+                            
+                            if combo not in existing_combinations:
+                                return candidates_sorted + [special_ball]
+    
+    # Fallback: return top 5 with top special ball (even if it's a repeat)
+    return optimized_by_general_frequency_repeat(frequency, special_frequency)
+
+def optimized_by_position_frequency_repeat(position_frequency, special_frequency):
+    """
+    Find top number at each position and 1 special ball with highest frequency (can repeat)
+    
+    Args:
+        position_frequency (dict): Dictionary of position -> number frequencies
+        special_frequency (dict): Dictionary of special ball frequencies
+    
+    Returns:
+        list: [number at pos0, pos1, pos2, pos3, pos4, special ball] (preserves position order)
+    """
+    optimized = []
+    
+    # Get most frequent number at each position (preserve position order)
+    for pos in range(5):
+        pos_key = f"position{pos}"
+        if pos_key in position_frequency:
+            sorted_pos = sorted(position_frequency[pos_key].items(), 
+                              key=lambda x: int(x[1]), reverse=True)
+            if sorted_pos:
+                optimized.append(int(sorted_pos[0][0]))
             else:
-                # If we've exhausted our frequency list, try a random new number
-                available_numbers = set(range(1, max_regular + 1)) - set(optimized_regular)
-                if available_numbers:
-                    # Replace the least frequent number with a random available one
-                    least_frequent_idx = 0
-                    least_frequent_val = float('inf')
-                    
-                    for i, num in enumerate(optimized_regular):
-                        num_freq = next((f for n, f in freq_list if n == num), 0)
-                        if num_freq < least_frequent_val:
-                            least_frequent_val = num_freq
-                            least_frequent_idx = i
-                    
-                    # Get the first available number (any would do)
-                    new_number = next(iter(available_numbers))
-                    optimized_regular[least_frequent_idx] = new_number
+                optimized.append(1)
         else:
-            # We've tried all regular number combinations from frequency list
-            # Try generating a random combination that isn't in existing_combinations
-            used_numbers = set()
-            while len(used_numbers) < 5:
-                # Pick the next available frequent number we haven't tried
-                for num, _ in freq_list:
-                    if num not in used_numbers and len(used_numbers) < 5:
-                        used_numbers.add(num)
-            
-            optimized_regular = sorted(list(used_numbers))
-        
-        # Sort the regular numbers again
-        optimized_regular.sort()
-        
-        # Recalculate the regular set
-        regular_set = tuple(optimized_regular)
-        attempts += 1
+            optimized.append(1)
     
-    # Always use the most frequent special ball
-    # Return the optimized 5 regular numbers + best special ball
-    return optimized_regular + [best_special_ball]
+    # Get most frequent special ball
+    sorted_special = sorted(special_frequency.items(), key=lambda x: int(x[1]), reverse=True)
+    best_special = int(sorted_special[0][0]) if sorted_special else 1
+    
+    return optimized + [best_special]
+
+def optimized_by_position_frequency_no_repeat(position_frequency, special_frequency, existing_combinations, max_regular, max_special):
+    """
+    Find top number at each position and 1 special ball with highest frequency that hasn't been drawn yet
+    
+    Args:
+        position_frequency (dict): Dictionary of position -> number frequencies
+        special_frequency (dict): Dictionary of special ball frequencies
+        existing_combinations (set): Set of existing combinations
+        max_regular (int): Maximum regular number
+        max_special (int): Maximum special ball number
+    
+    Returns:
+        list: [number at pos0, pos1, pos2, pos3, pos4, special ball] that hasn't been drawn (preserves position order)
+    """
+    # Get top candidates for each position
+    position_candidates = []
+    for pos in range(5):
+        pos_key = f"position{pos}"
+        if pos_key in position_frequency:
+            sorted_pos = sorted(position_frequency[pos_key].items(), 
+                              key=lambda x: int(x[1]), reverse=True)
+            # Get top 10 candidates for this position
+            candidates = [int(num) for num, _ in sorted_pos[:10]]
+            position_candidates.append(candidates if candidates else [1])
+        else:
+            position_candidates.append([1])
+    
+    # Get top special ball candidates
+    sorted_special = sorted(special_frequency.items(), key=lambda x: int(x[1]), reverse=True)
+    special_candidates = [int(num) for num, _ in sorted_special[:10]] if sorted_special else [1]
+    
+    # Try combinations until we find one that hasn't been drawn
+    max_attempts = 1000
+    attempts = 0
+    
+    for pos0 in position_candidates[0][:5]:
+        for pos1 in position_candidates[1][:5]:
+            for pos2 in position_candidates[2][:5]:
+                for pos3 in position_candidates[3][:5]:
+                    for pos4 in position_candidates[4][:5]:
+                        # Check if all positions have unique numbers
+                        numbers = [pos0, pos1, pos2, pos3, pos4]
+                        if len(set(numbers)) != 5:
+                            continue
+                        
+                        for special in special_candidates[:5]:
+                            if attempts >= max_attempts:
+                                break
+                            attempts += 1
+                            
+                            # Preserve position order (don't sort)
+                            combo = tuple(sorted(numbers)) + (special,)
+                            
+                            if combo not in existing_combinations:
+                                return numbers + [special]
+    
+    # Fallback: return top by position (even if it's a repeat)
+    return optimized_by_position_frequency_repeat(position_frequency, special_frequency)
 
 def calculate_standardized_residuals(frequency_dict, total_draws, max_number):
     """
@@ -398,6 +454,8 @@ def calculate_stats_for_type(draws, lottery_type, max_regular, max_special):
     Returns:
         dict: Calculated statistics
     """
+    # Get existing combinations for no-repeat strategies
+    existing_combinations = get_existing_combinations(draws)
     # Initialize counters
     valid_draws = 0
     frequency = {str(i): 0 for i in range(1, max_regular + 1)}
@@ -453,11 +511,18 @@ def calculate_stats_for_type(draws, lottery_type, max_regular, max_special):
     # Calculate optimized numbers (handle empty case)
     if valid_draws == 0:
         # Return default values when there are no draws
-        optimized_by_position = [1, 2, 3, 4, 5, 1]
-        optimized_by_general_frequency = [1, 2, 3, 4, 5, 1]
+        optimized_general_repeat = [1, 2, 3, 4, 5, 1]
+        optimized_general_no_repeat = [1, 2, 3, 4, 5, 1]
+        optimized_position_repeat = [1, 2, 3, 4, 5, 1]
+        optimized_position_no_repeat = [1, 2, 3, 4, 5, 1]
     else:
-        optimized_by_position = find_optimized_numbers(frequency, special_frequency)
-        optimized_by_general_frequency = find_optimized_numbers(frequency, special_frequency)
+        # Calculate all four optimization strategies
+        optimized_general_repeat = optimized_by_general_frequency_repeat(frequency, special_frequency)
+        optimized_general_no_repeat = optimized_by_general_frequency_no_repeat(
+            frequency, special_frequency, existing_combinations, max_regular, max_special)
+        optimized_position_repeat = optimized_by_position_frequency_repeat(position_frequency, special_frequency)
+        optimized_position_no_repeat = optimized_by_position_frequency_no_repeat(
+            position_frequency, special_frequency, existing_combinations, max_regular, max_special)
     
     # Calculate standardized residuals
     regular_residuals = calculate_standardized_residuals(frequency, valid_draws * 5, max_regular)
@@ -468,12 +533,14 @@ def calculate_stats_for_type(draws, lottery_type, max_regular, max_special):
     for pos, pos_freq in position_frequency.items():
         position_residuals[pos] = calculate_standardized_residuals(pos_freq, valid_draws, max_regular)
     
-    # Create the final statistics object with simplified structure
+    # Create the final statistics object with new structure
     stats = {
         "type": lottery_type,
         "totalDraws": valid_draws,
-        "optimizedByPosition": optimized_by_position,
-        "optimizedByGeneralFrequency": optimized_by_general_frequency,
+        "optimizedByGeneralFrequencyRepeat": optimized_general_repeat,
+        "optimizedByGeneralFrequencyNoRepeat": optimized_general_no_repeat,
+        "optimizedByPositionFrequencyRepeat": optimized_position_repeat,
+        "optimizedByPositionFrequencyNoRepeat": optimized_position_no_repeat,
         "regularNumbers": regular_residuals,
         "specialBallNumbers": special_residuals,
         "byPosition": position_residuals

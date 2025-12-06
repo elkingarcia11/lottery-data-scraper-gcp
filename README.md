@@ -50,8 +50,10 @@ lottery_data_scraper_gcp/
 {
     "type": "powerball" or "mega-millions",
     "totalDraws": int,
-    "optimizedByPosition": [int, int, int, int, int, int],
-    "optimizedByGeneralFrequency": [int, int, int, int, int, int],
+    "optimizedByGeneralFrequencyRepeat": [int, int, int, int, int, int],
+    "optimizedByGeneralFrequencyNoRepeat": [int, int, int, int, int, int],
+    "optimizedByPositionFrequencyRepeat": [int, int, int, int, int, int],
+    "optimizedByPositionFrequencyNoRepeat": [int, int, int, int, int, int],
     "regularNumbers": {
         "1": {
             "observed": int,
@@ -85,6 +87,13 @@ lottery_data_scraper_gcp/
 }
 ```
 
+**Optimization Strategies:**
+
+- `optimizedByGeneralFrequencyRepeat`: Top 5 numbers and 1 special ball by general frequency (can repeat previous combinations)
+- `optimizedByGeneralFrequencyNoRepeat`: Top 5 numbers and 1 special ball by general frequency that hasn't been drawn yet
+- `optimizedByPositionFrequencyRepeat`: Top number at each position (0-4) and 1 special ball by position-specific frequency (can repeat)
+- `optimizedByPositionFrequencyNoRepeat`: Top number at each position (0-4) and 1 special ball by position-specific frequency that hasn't been drawn yet
+
 ## Statistical Analysis
 
 ### Frequency Analysis
@@ -101,8 +110,14 @@ lottery_data_scraper_gcp/
 
 ### Optimized Numbers
 
-- `optimizedByPosition`: Most frequent numbers at each position
-- `optimizedByGeneralFrequency`: Most frequent numbers overall
+The statistics include four optimization strategies:
+
+- **`optimizedByGeneralFrequencyRepeat`**: Top 5 numbers and 1 special ball with highest general frequency (allows repeating previous combinations)
+- **`optimizedByGeneralFrequencyNoRepeat`**: Top 5 numbers and 1 special ball with highest general frequency that hasn't been drawn yet
+- **`optimizedByPositionFrequencyRepeat`**: Top number at each position (0-4) and 1 special ball with highest position-specific frequency (allows repeating)
+- **`optimizedByPositionFrequencyNoRepeat`**: Top number at each position (0-4) and 1 special ball with highest position-specific frequency that hasn't been drawn yet
+
+Each strategy returns an array of 6 numbers: `[regular1, regular2, regular3, regular4, regular5, specialBall]`
 
 ## Setup
 

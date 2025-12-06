@@ -315,38 +315,55 @@ def scrape_lottery_data():
         # Get latest draw dates from JSON files (always works with local files)
         latest_draws = get_latest_draws()
         
-        # If no draws found, set default dates to start from
-        if not latest_draws['powerball']:
-            latest_draws['powerball'] = '2020-01-01'
+        # Actual lottery start dates
+        POWERBALL_START_DATE = '1992-04-22'
+        MEGA_MILLIONS_START_DATE = '1996-08-31'
+        
+        # Track if we're starting fresh (no existing data)
+        pb_starting_fresh = not latest_draws['powerball']
+        mm_starting_fresh = not latest_draws['mega-millions']
+        
+        # If no draws found, set default dates to actual lottery start dates
+        if pb_starting_fresh:
+            latest_draws['powerball'] = POWERBALL_START_DATE
             print(f"No existing Powerball draws found. Starting from {latest_draws['powerball']}")
             
-        if not latest_draws['mega-millions']:
-            latest_draws['mega-millions'] = '2020-01-01'
+        if mm_starting_fresh:
+            latest_draws['mega-millions'] = MEGA_MILLIONS_START_DATE
             print(f"No existing Mega Millions draws found. Starting from {latest_draws['mega-millions']}")
             
         print(f"\nLatest Powerball draw: {latest_draws['powerball']}")
         print(f"Latest Mega Millions draw: {latest_draws['mega-millions']}\n")
         
-        # Extract year from the most recent draw date
+        # Extract year from the most recent draw date and current year
         current_year = datetime.now().year
+        latest_pb_date = datetime.strptime(latest_draws['powerball'], '%Y-%m-%d')
+        latest_mm_date = datetime.strptime(latest_draws['mega-millions'], '%Y-%m-%d')
         
-        # Construct URLs
-        powerball_url = f"https://www.lottery.net/powerball/numbers/{current_year}"
-        megamillions_url = f"https://www.lottery.net/mega-millions/numbers/{current_year}"
+        # Determine start years for scraping
+        # If starting fresh, scrape from the actual start year; otherwise from latest draw's year
+        pb_start_year = 1992 if pb_starting_fresh else latest_pb_date.year
+        mm_start_year = 1996 if mm_starting_fresh else latest_mm_date.year
         
         # Flag to track if any new draws were added
         any_new_draws = False
         
-        # Process Powerball draws
+        # Process Powerball draws - scrape all years from start to current
         print("\nProcessing Powerball draws...")
         print(f"Latest Powerball draw date: {latest_draws['powerball']}")
-        print(f"Scraping from: {powerball_url}")
         
-        powerball_draws = scrape_lottery_numbers(powerball_url, 'powerball')
+        all_powerball_draws = []
+        for year in range(pb_start_year, current_year + 1):
+            powerball_url = f"https://www.lottery.net/powerball/numbers/{year}"
+            print(f"Scraping Powerball from {year}...")
+            year_draws = scrape_lottery_numbers(powerball_url, 'powerball')
+            if year_draws:
+                all_powerball_draws.extend(year_draws)
+        
         filtered_powerball = []
-        if powerball_draws:
+        if all_powerball_draws:
             # Filter draws after the latest draw date
-            filtered_powerball = filter_lottery_data(powerball_draws, latest_draws['powerball'])
+            filtered_powerball = filter_lottery_data(all_powerball_draws, latest_draws['powerball'])
             if filtered_powerball:
                 # Save to JSON file
                 new_pb_draws = save_to_json(filtered_powerball, 'pb.json')
@@ -356,16 +373,22 @@ def scrape_lottery_data():
                 else:
                     print("No new Powerball draws to save")
         
-        # Process Mega Millions draws
+        # Process Mega Millions draws - scrape all years from start to current
         print("\nProcessing Mega Millions draws...")
         print(f"Latest Mega Millions draw date: {latest_draws['mega-millions']}")
-        print(f"Scraping from: {megamillions_url}")
         
-        megamillions_draws = scrape_lottery_numbers(megamillions_url, 'megamillions')
+        all_megamillions_draws = []
+        for year in range(mm_start_year, current_year + 1):
+            megamillions_url = f"https://www.lottery.net/mega-millions/numbers/{year}"
+            print(f"Scraping Mega Millions from {year}...")
+            year_draws = scrape_lottery_numbers(megamillions_url, 'megamillions')
+            if year_draws:
+                all_megamillions_draws.extend(year_draws)
+        
         filtered_megamillions = []
-        if megamillions_draws:
+        if all_megamillions_draws:
             # Filter draws after the latest draw date
-            filtered_megamillions = filter_lottery_data(megamillions_draws, latest_draws['mega-millions'])
+            filtered_megamillions = filter_lottery_data(all_megamillions_draws, latest_draws['mega-millions'])
             if filtered_megamillions:
                 # Save to JSON file
                 new_mm_draws = save_to_json(filtered_megamillions, 'mm.json')
