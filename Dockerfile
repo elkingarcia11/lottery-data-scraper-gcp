@@ -21,8 +21,11 @@ RUN mkdir -p data
 
 # Set environment variables (can be overridden)
 ENV LOTTERY_DATA_SCRAPER_BUCKET=jackpot-iq
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/gcs_credentials.json
+ENV PORT=8080
 
-# Run the script once
+# Expose the port Cloud Run will use
+EXPOSE 8080
+
+# Run the Flask server (listens on PORT env var)
 CMD ["python", "main.py"]
 

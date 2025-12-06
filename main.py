@@ -1,5 +1,6 @@
 import json
 import os
+from flask import Flask, jsonify
 from lottery_scraper import scrape_lottery_data, get_latest_draws, download_from_gcs, upload_to_gcs
 from calculate_stats import calculate_lottery_stats
 from dotenv import load_dotenv
@@ -10,7 +11,10 @@ load_dotenv()
 # Get bucket name from environment variable or use default
 BUCKET_NAME = os.getenv('LOTTERY_DATA_SCRAPER_BUCKET', 'jackpot-iq')
 
-def main():
+# Initialize Flask app
+app = Flask(__name__)
+
+def run_scraper():
     """
     Main function to scrape lottery data and save to JSON files
     """
@@ -71,6 +75,31 @@ def main():
     
     print("\n✓ Scrape and stats update completed successfully")
     print(f"✓ All data saved locally in data/ directory")
+    
+    return {
+        "status": "success",
+        "message": "Scrape and stats update completed successfully"
+    }
+
+@app.route('/', methods=['GET', 'POST'])
+def trigger_scraper():
+    """HTTP endpoint to trigger the lottery scraper"""
+    try:
+        result = run_scraper()
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for Cloud Run"""
+    return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
-    main() 
+    # Get port from environment variable (Cloud Run provides this)
+    port = int(os.environ.get('PORT', 8080))
+    # Run Flask app
+    app.run(host='0.0.0.0', port=port, debug=False) 

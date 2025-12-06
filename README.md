@@ -191,6 +191,45 @@ docker run --rm -v $(pwd)/data:/app/data lottery-scraper
 - The container runs once and exits automatically
 - To run again, simply execute the `docker run` command again
 
+### Google Cloud Run Deployment
+
+The application includes an HTTP server for Cloud Run deployment:
+
+**Deploy to Cloud Run:**
+
+```bash
+# Build and deploy
+gcloud run deploy lottery-scraper \
+  --source . \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars LOTTERY_DATA_SCRAPER_BUCKET=your-bucket-name
+```
+
+**Trigger the scraper:**
+
+```bash
+# Get the service URL
+SERVICE_URL=$(gcloud run services describe lottery-scraper --region us-central1 --format 'value(status.url)')
+
+# Trigger the scraper via HTTP
+curl -X POST $SERVICE_URL
+```
+
+**Health check:**
+
+```bash
+curl $SERVICE_URL/health
+```
+
+**Notes for Cloud Run:**
+
+- The service listens on the `PORT` environment variable (default 8080, Cloud Run provides this)
+- Data is saved to GCS (configured via `LOTTERY_DATA_SCRAPER_BUCKET`)
+- The service responds to HTTP requests and runs the scraper on each POST/GET to `/`
+- Use Cloud Scheduler to trigger it periodically if needed
+
 If you have GCS credentials set up, the script will:
 
 - Attempt to download existing data from GCS
