@@ -59,7 +59,8 @@ lottery_data_scraper_gcp/
             "observed": int,
             "expected": float,
             "residual": float,
-            "significant": boolean
+            "significant": boolean,
+            "percent": float
         },
         ...
     },
@@ -68,7 +69,8 @@ lottery_data_scraper_gcp/
             "observed": int,
             "expected": float,
             "residual": float,
-            "significant": boolean
+            "significant": boolean,
+            "percent": float
         },
         ...
     },
@@ -78,7 +80,8 @@ lottery_data_scraper_gcp/
                 "observed": int,
                 "expected": float,
                 "residual": float,
-                "significant": boolean
+                "significant": boolean,
+                "percent": float
             },
             ...
         },
@@ -107,6 +110,24 @@ lottery_data_scraper_gcp/
 - Calculates standardized residuals for each number
 - A number is considered statistically significant if |residual| > 2.0 (95% confidence)
 - Expected frequencies are calculated assuming uniform distribution
+
+### Percent Field
+
+The `percent` field represents the percentage frequency of each number:
+
+- **Regular numbers**: `percent = (observed / total_draws * 5) * 100`
+
+  - Since each draw has 5 regular numbers, this shows the percentage of all regular number slots that this number occupies
+  - Example: If a number appears 50 times out of 100 draws, percent = (50 / 100 _ 5) _ 100 = 250% (appears in 2.5 out of 5 positions on average)
+
+- **Position-specific (byPosition)**: `percent = (observed / total_draws) * 100`
+
+  - Shows the percentage of draws where this number appeared at this specific position
+  - Example: If a number appears 30 times at position 0 out of 100 draws, percent = (30 / 100) \* 100 = 30%
+
+- **Special ball**: `percent = (observed / total_draws) * 100`
+  - Shows the percentage of draws where this special ball number appeared
+  - Example: If a special ball number appears 5 times out of 100 draws, percent = (5 / 100) \* 100 = 5%
 
 ### Optimized Numbers
 
