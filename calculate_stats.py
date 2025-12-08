@@ -327,29 +327,37 @@ def optimized_by_position_frequency_no_repeat(position_frequency, special_freque
     # Fallback: return top by position (even if it's a repeat)
     return optimized_by_position_frequency_repeat(position_frequency, special_frequency)
 
-def calculate_standardized_residuals(frequency_dict, total_draws, max_number):
+def calculate_standardized_residuals(frequency_dict, total_draws, max_number, actual_draws=None, percent_multiplier=1.0):
     """
     Calculate standardized residuals for frequency data
     
     Args:
         frequency_dict (dict): Dictionary of number frequencies
-        total_draws (int): Total number of draws
+        total_draws (int): Total number of draws (for expected calculation)
         max_number (int): Maximum possible number
+        actual_draws (int): Actual number of draws for percent calculation (defaults to total_draws)
+        percent_multiplier (float): Multiplier for percent calculation (defaults to 1.0)
     
     Returns:
         dict: Dictionary of standardized residuals
     """
     residuals = {}
     
+    # Use actual_draws for percent calculation, default to total_draws
+    if actual_draws is None:
+        actual_draws = total_draws
+    
     # Handle case where there are no draws
     if total_draws == 0:
         expected = 0.0
         for number, observed in frequency_dict.items():
+            percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
             residuals[number] = {
                 "observed": observed,
                 "expected": expected,
                 "residual": 0.0,
-                "significant": False
+                "significant": False,
+                "percent": percent
             }
         return residuals
     
@@ -358,21 +366,25 @@ def calculate_standardized_residuals(frequency_dict, total_draws, max_number):
     # Avoid division by zero if expected is 0
     if expected == 0:
         for number, observed in frequency_dict.items():
+            percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
             residuals[number] = {
                 "observed": observed,
                 "expected": expected,
                 "residual": 0.0,
-                "significant": False
+                "significant": False,
+                "percent": percent
             }
         return residuals
     
     for number, observed in frequency_dict.items():
         residual = (observed - expected) / (expected ** 0.5)
+        percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
         residuals[number] = {
             "observed": observed,
             "expected": expected,
             "residual": residual,
-            "significant": abs(residual) > 2.0  # 95% confidence interval
+            "significant": abs(residual) > 2.0,  # 95% confidence interval
+            "percent": percent
         }
     
     return residuals
@@ -524,13 +536,19 @@ def calculate_stats_for_type(draws, lottery_type, max_regular, max_special):
             position_frequency, special_frequency, existing_combinations, max_regular, max_special)
     
     # Calculate standardized residuals
-    regular_residuals = calculate_standardized_residuals(frequency, valid_draws * 5, max_regular)
-    special_residuals = calculate_standardized_residuals(special_frequency, valid_draws, max_special)
+    # For regular numbers: percent = observed / total_draws * 5
+    regular_residuals = calculate_standardized_residuals(frequency, valid_draws * 5, max_regular, 
+                                                         actual_draws=valid_draws, percent_multiplier=5.0)
+    # For special ball: percent = observed / total_draws
+    special_residuals = calculate_standardized_residuals(special_frequency, valid_draws, max_special,
+                                                         actual_draws=valid_draws, percent_multiplier=1.0)
     
     # Calculate position-specific residuals
+    # For positionX: percent = observed / total_draws
     position_residuals = {}
     for pos, pos_freq in position_frequency.items():
-        position_residuals[pos] = calculate_standardized_residuals(pos_freq, valid_draws, max_regular)
+        position_residuals[pos] = calculate_standardized_residuals(pos_freq, valid_draws, max_regular,
+                                                                   actual_draws=valid_draws, percent_multiplier=1.0)
     
     # Create the final statistics object with new structure
     stats = {
