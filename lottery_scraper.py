@@ -14,7 +14,7 @@ DATA_DIR = 'data'
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # GCS bucket name from environment variable or use default
-LOTTERY_DATA_SCRAPER_BUCKET = os.getenv('LOTTERY_DATA_SCRAPER_BUCKET', 'jackpot-iq')
+LOTTERY_DATA_SCRAPER_BUCKET = os.getenv('LOTTERY_DATA_SCRAPER_BUCKET', '')
 
 def download_from_gcs():
     """
