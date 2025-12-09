@@ -105,11 +105,148 @@ lottery_data_scraper_gcp/
 - Special ball: Counts frequency of each special ball number
 - Position-specific: Counts frequency of each number at each position (0-4)
 
+**Position-Specific Ranges:**
+
+**Note: Positions are 0-indexed (0, 1, 2, 3, 4) where position 0 is the first (lowest) number and position 4 is the last (highest) number.**
+
+- Each position has a different valid range of numbers due to the constraint that numbers must be in ascending order:
+  - **Mega Millions**: Each position has 66 possible numbers
+    - Position 0: 1 to 66
+    - Position 1: 2 to 67
+    - Position 2: 3 to 68
+    - Position 3: 4 to 69
+    - Position 4: 5 to 70
+  - **Powerball**: Each position has 65 possible numbers
+    - Position 0: 1 to 65
+    - Position 1: 2 to 66
+    - Position 2: 3 to 67
+    - Position 3: 4 to 68
+    - Position 4: 5 to 69
+
 ### Statistical Significance
 
 - Calculates standardized residuals (z-scores) for each number using **exact binomial standard deviation**
 - A number is considered statistically significant if |residual| > 2.0 (95% confidence interval)
 - Expected frequencies are calculated assuming uniform distribution
+
+**Mathematical Foundation for General Frequency:**
+
+For general frequency (how often a specific number appears anywhere in the 5 white balls), the probability calculation is:
+
+For any specific number k (where k is between 1 and max_number):
+
+- **Total combinations with k**: C(max_number-1, 4) — because if k is in the draw, you choose the other 4 numbers from the remaining (max_number-1)
+- **Total possible combinations**: C(max_number, 5)
+
+**Probability that number k appears:**
+
+```
+P(k appears) = C(max_number-1, 4) / C(max_number, 5)
+             = 5 / max_number
+```
+
+**The result:**
+
+- **Mega Millions**: Every number from 1 to 70 has exactly the same probability: `5/70 = 1/14 ≈ 7.14%`
+- **Powerball**: Every number from 1 to 69 has exactly the same probability: `5/69 ≈ 7.25%`
+
+This makes intuitive sense: you're drawing 5 balls out of max_number, so each ball has a `5/max_number` chance of being selected.
+
+**Mathematical Foundation for Position-Specific Frequency:**
+
+For position-based frequency (how often a specific number appears in a specific position when the 5 white balls are sorted in ascending order), the probability calculation is:
+
+**Note: Positions are 0-indexed. Position 0 = first (lowest) number, Position 4 = last (highest) number.**
+
+For number k to appear in position p (where p = 0, 1, 2, 3, 4):
+
+**Number of combinations:**
+
+```
+Combinations = C(k-1, p) × C(max_number - k, 4-p)
+```
+
+**What each part means:**
+
+- `C(k-1, p)` = Number of ways to choose the p numbers that come before k (from numbers 1 to k-1)
+- `C(max_number - k, 4-p)` = Number of ways to choose the (4-p) numbers that come after k (from numbers k+1 to max_number)
+
+**Probability:**
+
+```
+P(k in position p) = C(k-1, p) × C(max_number - k, 4-p) / C(max_number, 5)
+```
+
+**Key insight:** The formula automatically handles dependencies (e.g., for 2 to be in position 1, the number 1 must be in position 0). Different numbers have different probabilities at the same position.
+
+**Examples (Mega Millions, max_number = 70):**
+
+- Number 1 in position 0: `C(0,0) × C(69,4) / C(70,5) = 1 × 864,501 / 12,103,014 ≈ 7.14%`
+- Number 2 in position 1: `C(1,1) × C(68,3) / C(70,5) = 1 × 50,116 / 12,103,014 ≈ 0.41%`
+- Number 35 in position 2: `C(34,2) × C(35,2) / C(70,5) = 561 × 595 / 12,103,014 ≈ 2.76%`
+
+**Step-by-Step Method for Position-Specific Statistics (Exact Method):**
+
+1. **Calculate the Expected Probability:**
+
+   ```
+   Expected probability = C(k-1, p) × C(max_number - k, 4-p) / C(max_number, 5)
+   ```
+
+   Example: For number 2 in position 1 (Mega Millions): `50,116 / 12,103,014 ≈ 0.00414` or `0.414%`
+
+2. **Calculate Expected Count:**
+
+   ```
+   Expected count = Expected probability × Total drawings
+   ```
+
+   Example: If there have been 1,000 drawings: `Expected count = 0.00414 × 1,000 ≈ 4.14`
+
+3. **Compare to Observed Count:**
+
+   ```
+   Observed percentage = (Observed count / Total drawings) × 100%
+   ```
+
+   Example: If 2 appeared in position 1 exactly 8 times: `Observed percentage = 8/1,000 = 0.8%`
+
+4. **Test for Statistical Significance (Z-test):**
+
+   ```
+   z = (Observed - Expected) / √(n × p × (1-p))
+   ```
+
+   Where:
+
+   - `n` = number of drawings
+   - `p` = expected probability
+   - `Observed` = observed count
+   - `Expected` = n × p
+
+   Example:
+
+   - `n = 1,000` drawings
+   - `p = 0.00414`
+   - `Expected = 4.14`
+   - `Observed = 8`
+   - `z = (8 - 4.14) / √(1000 × 0.00414 × 0.99586) ≈ 1.90`
+
+5. **Interpret the Z-score:**
+
+   - `|z| < 1.96`: Not statistically significant (95% confidence)
+   - `|z| > 1.96`: Statistically significant at 95% level
+   - `|z| > 2.58`: Statistically significant at 99% level
+
+   In the example above, `z ≈ 1.90`, so it's not quite a significant outlier at the 95% level.
+
+**Important Caveats:**
+
+⚠️ **Multiple Comparison Problem:** If you're checking all numbers across all positions (e.g., 70 numbers × 5 positions = 350 tests), you'd expect some "outliers" by chance alone. Use Bonferroni correction: divide your significance level (0.05) by number of tests (350) = `0.000143` for true significance.
+
+⚠️ **Sample Size Matters:** Need enough drawings for the test to be reliable. Generally want expected count ≥ 5.
+
+**Note:** The current implementation uses a simplified uniform approximation where each position has `(max_number - 4)` possible numbers, giving each number an equal probability of `1/(max_number - 4)` at that position. This approximation simplifies calculations while still providing useful statistical insights, though the true probabilities vary by number and position as shown above. The exact method described here could be implemented for more precise position-specific statistics.
 
 **Calculation Method:**
 
@@ -121,11 +258,15 @@ residual = (observed - expected) / standard_deviation
 
 Where:
 
-- **Expected frequency**: `total_draws / max_number`
+- **Expected frequency**:
+  - Regular numbers: `(total_draws × 5) / max_number` (exact combinatorial result)
+  - Position-specific: `total_draws / (max_number - 4)` (simplified uniform approximation; true probability varies by number and position as `C(k-1, p) × C(max_number - k, 4-p) / C(max_number, 5)`)
+  - Special ball: `total_draws / max_number`
 - **Standard deviation**: Uses exact binomial formula: `√(n × p × (1-p))`
   - `n` = number of draws
   - `p` = probability of number being selected in a single draw
   - For regular numbers: `p = 5/70` (Mega Millions) or `p = 5/69` (Powerball)
+  - For position-specific: `p = 1/66` (Mega Millions) or `p = 1/65` (Powerball) - simplified uniform approximation (true probability is `C(k-1, p) × C(max_number - k, 4-p) / C(max_number, 5)`)
   - For special ball: `p = 1/25` (Mega Millions) or `p = 1/26` (Powerball)
 
 This binomial approach is more accurate than Poisson approximation, especially for smaller sample sizes, as it accounts for the fixed number of selections per draw.
@@ -147,14 +288,15 @@ This binomial approach is more accurate than Poisson approximation, especially f
 
 The `percent` field represents the percentage frequency of each number:
 
-- **Regular numbers**: `percent = (observed / total_draws * 5) * 100`
+- **Regular numbers**: `percent = (observed / total_slots) * 100` where `total_slots = number_of_draws * 5`
 
   - Since each draw has 5 regular numbers, this shows the percentage of all regular number slots that this number occupies
-  - Example: If a number appears 50 times out of 100 draws, percent = (50 / 100 _ 5) _ 100 = 250% (appears in 2.5 out of 5 positions on average)
+  - Example: If a number appears 50 times out of 100 draws (500 total slots), percent = (50 / 500) \* 100 = 10%
 
 - **Position-specific (byPosition)**: `percent = (observed / total_draws) * 100`
 
   - Shows the percentage of draws where this number appeared at this specific position
+  - Note: Expected frequency accounts for the fact that each position has fewer possible numbers (66 for Mega Millions, 65 for Powerball)
   - Example: If a number appears 30 times at position 0 out of 100 draws, percent = (30 / 100) \* 100 = 30%
 
 - **Special ball**: `percent = (observed / total_draws) * 100`

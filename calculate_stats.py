@@ -5,6 +5,23 @@ import argparse
 import os
 import math
 
+# Try to import comb, fallback to manual calculation if not available (Python < 3.8)
+try:
+    from math import comb
+except ImportError:
+    def comb(n, k):
+        """Calculate C(n, k) = n! / (k! * (n-k)!)"""
+        if k < 0 or k > n:
+            return 0
+        if k == 0 or k == n:
+            return 1
+        # Use multiplicative formula for efficiency
+        k = min(k, n - k)  # Use symmetry
+        result = 1
+        for i in range(k):
+            result = result * (n - i) // (i + 1)
+        return result
+
 # Ensure data directory exists
 DATA_DIR = 'data'
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -352,7 +369,7 @@ def calculate_standardized_residuals(frequency_dict, total_draws, max_number, ac
     if total_draws == 0:
         expected = 0.0
         for number, observed in frequency_dict.items():
-            percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
+            percent = (observed / total_draws * 100) if total_draws > 0 else 0.0
             residuals[number] = {
                 "observed": observed,
                 "expected": expected,
@@ -367,7 +384,7 @@ def calculate_standardized_residuals(frequency_dict, total_draws, max_number, ac
     # Avoid division by zero if expected is 0
     if expected == 0:
         for number, observed in frequency_dict.items():
-            percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
+            percent = (observed / total_draws * 100) if total_draws > 0 else 0.0
             residuals[number] = {
                 "observed": observed,
                 "expected": expected,
@@ -390,7 +407,7 @@ def calculate_standardized_residuals(frequency_dict, total_draws, max_number, ac
     # Avoid division by zero
     if std_dev == 0:
         for number, observed in frequency_dict.items():
-            percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
+            percent = (observed / total_draws * 100) if total_draws > 0 else 0.0
             residuals[number] = {
                 "observed": observed,
                 "expected": expected,
@@ -403,7 +420,7 @@ def calculate_standardized_residuals(frequency_dict, total_draws, max_number, ac
     for number, observed in frequency_dict.items():
         # Use exact binomial standard deviation for more accurate residuals
         residual = (observed - expected) / std_dev
-        percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
+        percent = (observed / total_draws * 100) if total_draws > 0 else 0.0
         residuals[number] = {
             "observed": observed,
             "expected": expected,
@@ -413,6 +430,152 @@ def calculate_standardized_residuals(frequency_dict, total_draws, max_number, ac
         }
     
     return residuals
+
+def calculate_exact_position_probability(number, position, max_number):
+    """
+    Calculate the exact probability that a specific number appears in a specific position
+    using the combinatorial formula: C(k-1, p) × C(max_number - k, 4-p) / C(max_number, 5)
+    
+    Args:
+        number (int): The number (k) to calculate probability for
+        position (int): The position (p) where 0 <= p <= 4. Positions are 0-indexed:
+                       0 = first (lowest) number, 1 = second, 2 = third, 3 = fourth, 4 = fifth (highest)
+        max_number (int): Maximum possible number (70 for Mega Millions, 69 for Powerball)
+    
+    Returns:
+        float: The probability that number k appears in position p
+    """
+    k = int(number)
+    p = int(position)
+    
+    # Handle edge cases
+    if k < 1 or k > max_number:
+        return 0.0
+    if p < 0 or p > 4:
+        return 0.0
+    
+    # Check if number can appear in this position
+    # Positions are 0-indexed: 0 = first (lowest), 1 = second, 2 = third, 3 = fourth, 4 = fifth (highest)
+    # Position 0: numbers 1 to (max_number - 4)  [first position, lowest number]
+    # Position 1: numbers 2 to (max_number - 3)  [second position]
+    # Position 2: numbers 3 to (max_number - 2)  [third position]
+    # Position 3: numbers 4 to (max_number - 1)  [fourth position]
+    # Position 4: numbers 5 to max_number        [fifth position, highest number]
+    min_for_position = p + 1
+    max_for_position = max_number - (4 - p)
+    
+    if k < min_for_position or k > max_for_position:
+        return 0.0
+    
+    # Calculate combinations
+    # C(k-1, p): ways to choose p numbers before k
+    # C(max_number - k, 4-p): ways to choose (4-p) numbers after k
+    # C(max_number, 5): total possible combinations
+    
+    try:
+        before = comb(k - 1, p) if k - 1 >= p else 0
+        after = comb(max_number - k, 4 - p) if (max_number - k) >= (4 - p) else 0
+        total = comb(max_number, 5)
+        
+        if total == 0:
+            return 0.0
+        
+        probability = (before * after) / total
+        return probability
+    except (ValueError, OverflowError):
+        return 0.0
+
+def calculate_exact_position_specific_residuals(frequency_at_position, total_draws, max_number):
+    """
+    Calculate standardized residuals for position-specific frequencies using exact combinatorial probabilities
+    
+    Args:
+        frequency_at_position (dict): Dictionary of position -> number frequencies
+            Position keys should be "0", "1", "2", "3", "4" (0-indexed, where 0=first, 4=fifth)
+        total_draws (int): Total number of draws
+        max_number (int): Maximum possible number (70 for Mega Millions, 69 for Powerball)
+    
+    Returns:
+        dict: Dictionary with standardized residuals, expected values, and significance flags for each position
+            Keys are "0", "1", "2", "3", "4" (0-indexed positions)
+    """
+    position_residuals = {}
+    
+    # Handle case where there are no draws
+    if total_draws == 0:
+        for pos in range(5):
+            pos_str = str(pos)
+            if pos_str not in frequency_at_position:
+                position_residuals[pos_str] = {}
+                continue
+            pos_freq = frequency_at_position[pos_str]
+            residuals = {}
+            for num, observed in pos_freq.items():
+                residuals[num] = {
+                    "observed": observed,
+                    "expected": 0.0,
+                    "residual": 0.0,
+                    "significant": False,
+                    "percent": 0.0
+                }
+            position_residuals[pos_str] = residuals
+        return position_residuals
+    
+    # Calculate residuals for each position (0-4 for regular numbers)
+    # Positions are 0-indexed: 0=first (lowest), 1=second, 2=third, 3=fourth, 4=fifth (highest)
+    for pos in range(5):
+        pos_str = str(pos)
+        if pos_str not in frequency_at_position:
+            position_residuals[pos_str] = {}
+            continue
+            
+        pos_freq = frequency_at_position[pos_str]
+        residuals = {}
+        
+        for num_str, observed in pos_freq.items():
+            num = int(num_str)
+            observed_count = int(observed)
+            
+            # Calculate exact probability for this number at this position
+            probability = calculate_exact_position_probability(num, pos, max_number)
+            
+            # Calculate expected count
+            expected = probability * total_draws
+            
+            # Calculate binomial standard deviation: sqrt(n * p * (1-p))
+            # where n = total_draws, p = probability
+            if probability > 0 and probability < 1:
+                std_dev = math.sqrt(total_draws * probability * (1 - probability))
+            else:
+                std_dev = 0.0
+            
+            # Calculate standardized residual (z-score)
+            if std_dev > 0:
+                residual = (observed_count - expected) / std_dev
+            else:
+                residual = 0.0
+            
+            # Calculate percent: (observed / total_draws) * 100
+            percent = (observed_count / total_draws * 100) if total_draws > 0 else 0.0
+            
+            # Determine significance levels
+            # 95% confidence (|z| > 1.96)
+            is_significant = abs(residual) > 1.96
+            # 99% confidence (|z| > 2.58)
+            is_very_significant = abs(residual) > 2.58
+            
+            residuals[num_str] = {
+                "observed": observed_count,
+                "expected": expected,
+                "residual": residual,
+                "significant": is_significant,
+                "verySignificant": is_very_significant,
+                "percent": percent
+            }
+        
+        position_residuals[pos_str] = residuals
+    
+    return position_residuals
 
 def calculate_position_specific_residuals(frequency_at_position, total_draws, k):
     """
@@ -450,6 +613,7 @@ def calculate_position_specific_residuals(frequency_at_position, total_draws, k)
         return position_residuals
     
     # Calculate residuals for each position (0-4 for regular numbers)
+    # Positions are 0-indexed: 0=first (lowest), 1=second, 2=third, 3=fourth, 4=fifth (highest)
     for pos in range(5):
         pos_str = str(pos)
         pos_freq = frequency_at_position[pos_str]
@@ -561,19 +725,33 @@ def calculate_stats_for_type(draws, lottery_type, max_regular, max_special):
             position_frequency, special_frequency, existing_combinations, max_regular, max_special)
     
     # Calculate standardized residuals
-    # For regular numbers: percent = observed / total_draws * 5
+    # For regular numbers: percent = observed / (valid_draws * 5) * 100
+    # total_draws = valid_draws * 5 (total number of regular number slots)
     regular_residuals = calculate_standardized_residuals(frequency, valid_draws * 5, max_regular, 
                                                          actual_draws=valid_draws, percent_multiplier=5.0)
     # For special ball: percent = observed / total_draws
     special_residuals = calculate_standardized_residuals(special_frequency, valid_draws, max_special,
                                                          actual_draws=valid_draws, percent_multiplier=1.0)
     
-    # Calculate position-specific residuals
+    # Calculate position-specific residuals using exact combinatorial method
     # For positionX: percent = observed / total_draws
-    position_residuals = {}
-    for pos, pos_freq in position_frequency.items():
-        position_residuals[pos] = calculate_standardized_residuals(pos_freq, valid_draws, max_regular,
-                                                                   actual_draws=valid_draws, percent_multiplier=1.0)
+    # Uses exact probability: C(k-1, p) × C(max_number - k, 4-p) / C(max_number, 5)
+    # Convert position_frequency keys from "position0" to "0" format
+    position_freq_dict = {}
+    for pos_key, pos_freq in position_frequency.items():
+        # Extract position number from "position0", "position1", etc.
+        pos_num = pos_key.replace("position", "")
+        position_freq_dict[pos_num] = pos_freq
+    
+    position_residuals = calculate_exact_position_specific_residuals(
+        position_freq_dict, valid_draws, max_regular
+    )
+    
+    # Convert back to "position0" format for consistency
+    position_residuals_formatted = {}
+    for pos_num, residuals in position_residuals.items():
+        position_residuals_formatted[f"position{pos_num}"] = residuals
+    position_residuals = position_residuals_formatted
     
     # Create the final statistics object with new structure
     stats = {
