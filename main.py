@@ -48,8 +48,8 @@ def run_scraper():
     print("Scraping new lottery data...")
     scrape_lottery_data()
     
-    # Calculate and save statistics (always saves locally)
-    print("\nUpdating statistics based on new draws...")
+    # Calculate and save statistics (always recalculates, even if no new draws found)
+    print("\nRecalculating statistics from existing data...")
     try:
         mm_stats, pb_stats = calculate_lottery_stats()
         

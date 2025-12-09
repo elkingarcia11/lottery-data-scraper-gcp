@@ -3,6 +3,7 @@
 import json
 import argparse
 import os
+import math
 
 # Ensure data directory exists
 DATA_DIR = 'data'
@@ -376,8 +377,32 @@ def calculate_standardized_residuals(frequency_dict, total_draws, max_number, ac
             }
         return residuals
     
+    # Calculate probability per draw
+    # For regular numbers: total_draws = actual_draws * 5, so p = 5/max_number
+    # For special ball: total_draws = actual_draws, so p = 1/max_number
+    numbers_per_draw = total_draws / actual_draws if actual_draws > 0 else 0
+    probability = numbers_per_draw / max_number if max_number > 0 else 0
+    
+    # Calculate binomial standard deviation: sqrt(n * p * (1-p))
+    # where n = actual_draws (number of draws), p = probability
+    std_dev = math.sqrt(actual_draws * probability * (1 - probability)) if actual_draws > 0 and probability > 0 else 0.0
+    
+    # Avoid division by zero
+    if std_dev == 0:
+        for number, observed in frequency_dict.items():
+            percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
+            residuals[number] = {
+                "observed": observed,
+                "expected": expected,
+                "residual": 0.0,
+                "significant": False,
+                "percent": percent
+            }
+        return residuals
+    
     for number, observed in frequency_dict.items():
-        residual = (observed - expected) / (expected ** 0.5)
+        # Use exact binomial standard deviation for more accurate residuals
+        residual = (observed - expected) / std_dev
         percent = (observed / actual_draws * percent_multiplier * 100) if actual_draws > 0 else 0.0
         residuals[number] = {
             "observed": observed,

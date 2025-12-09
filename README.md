@@ -107,9 +107,41 @@ lottery_data_scraper_gcp/
 
 ### Statistical Significance
 
-- Calculates standardized residuals for each number
-- A number is considered statistically significant if |residual| > 2.0 (95% confidence)
+- Calculates standardized residuals (z-scores) for each number using **exact binomial standard deviation**
+- A number is considered statistically significant if |residual| > 2.0 (95% confidence interval)
 - Expected frequencies are calculated assuming uniform distribution
+
+**Calculation Method:**
+
+For each number, the standardized residual is calculated as:
+
+```
+residual = (observed - expected) / standard_deviation
+```
+
+Where:
+
+- **Expected frequency**: `total_draws / max_number`
+- **Standard deviation**: Uses exact binomial formula: `√(n × p × (1-p))`
+  - `n` = number of draws
+  - `p` = probability of number being selected in a single draw
+  - For regular numbers: `p = 5/70` (Mega Millions) or `p = 5/69` (Powerball)
+  - For special ball: `p = 1/25` (Mega Millions) or `p = 1/26` (Powerball)
+
+This binomial approach is more accurate than Poisson approximation, especially for smaller sample sizes, as it accounts for the fixed number of selections per draw.
+
+**Example (Regular Numbers, 1,000 draws):**
+
+- Expected: `(1000 × 5) / 70 = 71.43` appearances
+- Standard deviation: `√(1000 × (5/70) × (65/70)) ≈ 8.14`
+- Normal range (95% confidence): `71.43 ± 16.28` (approximately 55-87 appearances)
+- Numbers outside this range are statistically significant
+
+**Example (Special Ball, 1,000 draws):**
+
+- Expected: `1000 / 25 = 40` appearances
+- Standard deviation: `√(1000 × (1/25) × (24/25)) ≈ 6.20`
+- Normal range (95% confidence): `40 ± 12.4` (approximately 28-52 appearances)
 
 ### Percent Field
 

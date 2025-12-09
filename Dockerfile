@@ -26,6 +26,7 @@ ENV PORT=8080
 # Expose the port Cloud Run will use
 EXPOSE 8080
 
-# Run the Flask server (listens on PORT env var)
-CMD ["python", "main.py"]
+# Run the Flask server with gunicorn (production WSGI server)
+# Use gunicorn for production, fallback to python main.py for local dev
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "2", "--timeout", "300", "main:app"]
 
